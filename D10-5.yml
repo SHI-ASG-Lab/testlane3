@@ -1,0 +1,39 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+                               
+  vars_files:
+    - ./vars.yml
+  
+  tasks:
+    - name: Create internal virtual network interface card
+      azure_rm_networkinterface:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-D10-5-internal-nic"
+        create_with_security_group: no      
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-internal-subnet"
+        enable_accelerated_networking: no
+        enable_ip_forwarding: no
+        ip_configurations:
+          - name: ipcfg01
+            private_ip_allocation_method: Dynamic
+    
+    - name: "Create D10-5 VM"
+      azure_rm_virtualmachine:
+        resource_group: "{{ lane_rg }}"
+        boot_diagnostics:
+          enabled: yes
+        name: "{{ practice }}-{{ lane }}-D10-5"
+        vm_size: Standard_E2s_v3
+        admin_username: shi
+        admin_password: 5ecur!ty_10I
+        os_type: "Linux"
+        network_interface_names: "{{ practice }}-{{ lane }}-D10-5-internal-nic"
+        managed_disk_type: Standard_LRS
+        image:
+          offer: "debian-10"
+          publisher: "Debian"
+          sku: "10"
+          version: "latest"
+

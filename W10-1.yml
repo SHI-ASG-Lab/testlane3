@@ -1,0 +1,62 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+                               
+  vars_files:
+    - ./vars.yml
+  
+  tasks:
+    - name: Create public IP address
+      azure_rm_publicipaddress:
+        resource_group: "{{ lane_rg }}"
+        domain_name_label: "{{ vm_name2 }}"
+        allocation_method: Static
+        name: "{{ practice }}-{{ lane }}-W10-1-mgmt-publicip"
+        sku: Standard
+
+    - name: Create management virtual network interface card
+      azure_rm_networkinterface:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-W10-1-mgmt-nic"
+        create_with_security_group: no
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-mgmt-subnet"
+        enable_ip_forwarding: yes
+        ip_configurations:
+          - name: ipcfg1
+            private_ip_allocation_method: Static
+            private_ip_address: 10.{{ lane_num }}.100.5
+            public_ip_name: "{{ practice }}-{{ lane }}-W10-1-mgmt-publicip"
+            public_ip_allocation_method: Static
+
+    - name: Create internal virtual network interface card
+      azure_rm_networkinterface:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-W10-1-internal-nic"
+        create_with_security_group: no      
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-internal-subnet"
+        ip_configurations:
+          - name: ipcfg02
+            private_ip_allocation_method: Dynamic
+    
+    - name: "Create W10-1 VM"
+      azure_rm_virtualmachine:
+        resource_group: "{{ lane_rg }}"
+        boot_diagnostics:
+          enabled: no
+        name: "{{ practice }}-{{ lane }}-W10-1"
+        vm_size: Standard_E2s_v3
+        admin_username: shi
+        admin_password: 5ecur!ty_10I
+        os_type: "Windows"
+        network_interface_names: 
+          - "{{ practice }}-{{ lane }}-W10-1-mgmt-nic"
+          - "{{ practice }}-{{ lane }}-W10-1-internal-nic"
+        managed_disk_type: Standard_LRS
+        image:
+          offer: "Windows-10"
+          publisher: "MicrosoftWindowsDesktop"
+          sku: "20h1-pro"
+          version: "latest"
+

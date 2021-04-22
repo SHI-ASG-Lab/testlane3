@@ -1,0 +1,260 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+                               
+  vars_files:
+    - ./vars.yml
+  
+  tasks:
+    - name: Create resource group
+      azure_rm_resourcegroup:
+        name: "{{ lane_rg }}"
+        location: southcentralus
+
+    - name: Create virtual network
+      azure_rm_virtualnetwork:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-vnet"
+        address_prefixes_cidr: "10.{{ lane_num }}.0.0/16"
+        state: present
+
+    - name: Create wan route table
+      azure_rm_routetable:
+        name: "{{ practice }}-{{ lane }}-wan-routetable"
+        resource_group: "{{ lane_rg }}"
+    - name: Create route wan_vnet
+      azure_rm_route:
+        name: wan_vnet
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "vnet_local"
+        address_prefix: "10.{{ lane_num }}.3.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-wan-routetable"
+        state: "present"
+    - name: Create route wan2internet
+      azure_rm_route:
+        name: wan2internet
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "internet"
+        address_prefix: "0.0.0.0/0"
+        route_table_name: "{{ practice }}-{{ lane }}-wan-routetable"
+        state: "present"
+    - name: Create route wan2internal
+      azure_rm_route:
+        name: wan2internal
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "virtual_appliance"
+        address_prefix: "10.{{ lane_num }}.1.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-wan-routetable"
+        next_hop_ip_address: "10.{{ lane_num }}.3.4"
+        state: "present"
+    - name: Create route wan2mgmt
+      azure_rm_route:
+        name: wan2mgmt
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "virtual_appliance"
+        address_prefix: "10.{{ lane_num }}.100.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-wan-routetable"
+        next_hop_ip_address: 10.{{ lane_num }}.3.1
+        state: present
+
+    - name: Create internal route table
+      azure_rm_routetable:
+        name: "{{ practice }}-{{ lane }}-internal-routetable"
+        resource_group: "{{ lane_rg }}"
+    - name: Create route internal_vnet
+      azure_rm_route:
+        name: internal_vnet
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "vnet_local"
+        address_prefix: "10.{{ lane_num }}.1.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-internal-routetable"
+        state: "present"
+    - name: Create route internal2internet
+      azure_rm_route:
+        name: internal2internet
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "virtual_appliance"
+        address_prefix: "0.0.0.0/0"
+        route_table_name: "{{ practice }}-{{ lane }}-internal-routetable"
+        next_hop_ip_address: "10.{{ lane_num }}.1.4"
+        state: "present"        
+    - name: Create route internal2wan
+      azure_rm_route:
+        name: "internal2wan"
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "virtual_appliance"
+        address_prefix: "10.{{ lane_num }}.3.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-internal-routetable"
+        next_hop_ip_address: "10.{{ lane_num }}.1.4"
+        state: present
+    - name: Create route internal2mgmt
+      azure_rm_route:
+        name: internal2mgmt
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "virtual_appliance"
+        address_prefix: "10.{{ lane_num }}.100.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-internal-routetable"
+        next_hop_ip_address: "10.{{ lane_num }}.1.1"
+        state: present
+
+    - name: Create management route table
+      azure_rm_routetable:
+        name: "{{ practice }}-{{ lane }}-mgmt-routetable"
+        resource_group: "{{ lane_rg }}"
+    - name: Create route mgmt_vnet
+      azure_rm_route:
+        name: mgmt_vnet
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: vnet_local
+        address_prefix: "10.{{ lane_num }}.100.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-mgmt-routetable"
+        state: "present"
+    - name: Create route mgmt2internet
+      azure_rm_route:
+        name: mgmt2internet
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "internet"
+        address_prefix: "0.0.0.0/0"
+        route_table_name: "{{ practice }}-{{ lane }}-mgmt-routetable"
+        state: "present"
+    - name: Create route mgmt2internal
+      azure_rm_route:
+        name: mgmt2internal
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: "virtual_appliance"
+        address_prefix: "10.{{ lane_num }}.1.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-mgmt-routetable"
+        next_hop_ip_address: "10.{{ lane_num }}.100.1"
+        state: present
+    - name: Create route mgmt2wan
+      azure_rm_route: 
+        name: mgmt2wan
+        resource_group: "{{ lane_rg }}"
+        next_hop_type: virtual_appliance
+        address_prefix: "10.{{ lane_num }}.3.0/24"
+        route_table_name: "{{ practice }}-{{ lane }}-mgmt-routetable"
+        next_hop_ip_address: "10.{{ lane_num }}.100.1"
+        state: present
+
+    - name: Create Management Network Security Group
+      azure_rm_securitygroup:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-mgmt-NSG"
+        rules:
+          - name: HTTPS
+            protocol: Tcp
+            destination_port_range: 443
+            access: Allow
+            priority: 110
+            direction: Inbound
+          - name: HTTP
+            protocol: Tcp
+            destination_port_range: 80
+            access: Allow
+            priority: 120
+            direction: Inbound
+          - name: RDP
+            protocol: Tcp
+            destination_port_range: 3389
+            access: Allow
+            priority: 130
+            direction: Inbound
+          - name: SSH
+            protocol: Tcp
+            destination_port_range: 22
+            access: Allow
+            priority: 140
+            direction: Inbound
+          - name: Outbound
+            access: Allow
+            priority: 150
+            direction: Outbound            
+    - name: Create Internal Network Security Group
+      azure_rm_securitygroup:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-internal-NSG"
+    - name: Create WAN/DMZ Network Security Group
+      azure_rm_securitygroup:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-wan-NSG"
+        rules:
+          - name: Outbound
+            access: Allow
+            priority: 110
+            direction: Outbound           
+          - name: HTTPS
+            protocol: Tcp
+            destination_port_range: 443
+            access: Allow
+            priority: 130
+            direction: Inbound
+    - name: Add management subnet
+      azure_rm_subnet:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-mgmt-subnet"
+        address_prefix_cidr: "10.{{ lane_num }}.100.0/24"
+        virtual_network_name: "{{ practice }}-{{ lane }}-vnet"
+        security_group_name: "{{ practice }}-{{ lane }}-mgmt-NSG"
+        route_table: "{{ practice }}-{{ lane }}-mgmt-routetable"
+    - name: Add subnet wan
+      azure_rm_subnet:  
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-wan-subnet"
+        address_prefix_cidr: "10.{{ lane_num }}.3.0/24"
+        virtual_network_name: "{{ practice }}-{{ lane }}-vnet"
+        security_group_name: "{{ practice }}-{{ lane }}-wan-NSG"
+        route_table: "{{ practice }}-{{ lane }}-wan-routetable"
+    - name: Add subnet internal
+      azure_rm_subnet:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-internal-subnet"
+        address_prefix_cidr: "10.{{ lane_num }}.1.0/24"
+        virtual_network_name: "{{ practice }}-{{ lane }}-vnet"
+        security_group_name: "{{ practice }}-{{ lane }}-internal-NSG"
+        route_table: "{{ practice }}-{{ lane }}-internal-routetable"
+
+    - name: Create public IP address
+      azure_rm_publicipaddress:
+        resource_group: "{{ lane_rg }}"
+        domain_name_label: "{{ vm_name }}"
+        allocation_method: Static
+        name: "{{ practice }}-{{ lane }}-{{ device_type }}-mgmt-publicip"
+        sku: Standard
+
+    - name: Create management virtual network interface card
+      azure_rm_networkinterface:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-{{ device_type }}-mgmt-nic"
+        create_with_security_group: no
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-mgmt-subnet"
+        enable_ip_forwarding: yes
+        ip_configurations:
+          - name: ipcfg1
+            private_ip_allocation_method: Static
+            private_ip_address: 10.{{ lane_num }}.100.5
+            public_ip_name: "{{ practice }}-{{ lane }}-{{ device_type }}-mgmt-publicip"
+            public_ip_allocation_method: Static
+    
+    - name: "Create {{ vendor }} {{ device_type }} VM"
+      azure_rm_virtualmachine:
+        resource_group: "{{ lane_rg }}"
+        boot_diagnostics:
+          enabled: yes
+        name: "{{ practice }}-{{ lane }}-{{ device_type }}"
+        vm_size: Standard_D4_v2
+        admin_username: shi
+        admin_password: 5ecur!ty_10I
+        ssh_password_enabled: true
+        managed_disk_type: Standard_LRS
+        network_interface_names: "{{ practice }}-{{ lane }}-{{ device_type }}-mgmt-nic"
+        plan:
+          name: "fmcv-azure-byol"
+          product: "cisco-fmcv"
+          promotionCode: null
+          publisher: "cisco"
+        image:
+          offer: "cisco-fmcv"
+          publisher: "cisco"
+          sku: "fmcv-azure-byol"
+          version: "latest"

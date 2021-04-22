@@ -1,0 +1,89 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+                               
+  vars_files:
+    - ./vars.yml
+  
+  tasks:
+    - name: Create MGMT public IP address
+      azure_rm_publicipaddress:
+        resource_group: "{{ lane_rg }}"
+        domain_name_label: "{{ vm_name1 }}"
+        allocation_method: Static
+        name: "{{ practice }}-{{ lane }}-{{ device1_type }}-mgmt-publicip"
+        sku: Standard
+    - name: Create WAN public IP address
+      azure_rm_publicipaddress:
+        resource_group: "{{ lane_rg }}"
+        allocation_method: Static
+        name: "{{ practice }}-{{ lane }}-{{ device1_type }}-wan-publicip"
+        sku: Standard    
+    - name: Create management virtual network interface card
+      azure_rm_networkinterface:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-{{ device1_type }}-mgmt-nic"
+        create_with_security_group: no
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-mgmt-subnet"
+        enable_ip_forwarding: yes
+        ip_configurations:
+          - name: ipcfg1
+            private_ip_allocation_method: Static
+            private_ip_address: 10.{{ lane_num }}.100.4
+            public_ip_name: "{{ practice }}-{{ lane }}-{{ device1_type }}-mgmt-publicip"
+            public_ip_allocation_method: Static
+    - name: Create wan virtual network interface card
+      azure_rm_networkinterface: 
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-{{ device1_type }}-wan-nic"
+        create_with_security_group: no
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-wan-subnet"
+        enable_accelerated_networking: yes
+        enable_ip_forwarding: yes
+        ip_configurations:
+          - name: ipcfg2
+            private_ip_allocation_method: Static
+            private_ip_address: 10.{{ lane_num }}.3.4
+            public_ip_name: "{{ practice }}-{{ lane }}-{{ device1_type }}-wan-publicip"
+            public_ip_allocation_method: Static
+    - name: Create internal virtual network interface card
+      azure_rm_networkinterface:
+        resource_group: "{{ lane_rg }}"
+        name: "{{ practice }}-{{ lane }}-{{ device1_type }}-internal-nic"
+        create_with_security_group: no      
+        virtual_network: "{{ practice }}-{{ lane }}-vnet"
+        subnet: "{{ practice }}-{{ lane }}-internal-subnet"
+        enable_accelerated_networking: yes
+        enable_ip_forwarding: yes
+        ip_configurations:
+          - name: ipcfg3
+            private_ip_allocation_method: Static
+            private_ip_address: "10.{{ lane_num }}.1.4"
+
+    - name: "Create {{ vendor }} {{ device1_type }} VM"
+      azure_rm_virtualmachine:
+        resource_group: "{{ lane_rg }}"
+        boot_diagnostics:
+          enabled: yes
+        name: "{{ practice }}-{{ lane }}-{{ device1_type }}"
+        vm_size: Standard_D3_v2
+        admin_username: shi
+        admin_password: 5ecur!ty_10I
+        ssh_password_enabled: true
+        network_interface_names:
+          - "{{ practice }}-{{ lane }}-{{ device1_type }}-mgmt-nic"
+          - "{{ practice }}-{{ lane }}-{{ device1_type }}-wan-nic"
+          - "{{ practice }}-{{ lane }}-{{ device1_type }}-internal-nic"
+        managed_disk_type: Standard_LRS
+        plan:
+          name: "ftdv-azure-payg"
+          product: "cisco-ftdv"
+          promotionCode: null
+          publisher: "cisco"
+        image:
+          offer: "cisco-ftdv"
+          publisher: "cisco"
+          sku: "ftdv-azure-payg"
+          version: "latest"
